@@ -3,7 +3,11 @@ const { ExerciseModel } = require('../models/ExerciseModel')
 
 exports.createNewUser = (req, res, next) => {
 
-    var request = req.body
+    if (req.body.username === '') {
+        return res.json({ error: 'username is required' });
+    }
+
+    var username = req.body.username
 
     var user = UserModel({ username: request.username })
 
@@ -19,6 +23,18 @@ exports.getUsers = (req, res, next) => {
 }
 
 exports.registerUserExercise = async (req, res, next) => {
+
+    if (req.params._id === '0') {
+        return res.json({ error: '_id is required' });
+    }
+
+    if (req.body.description === '') {
+        return res.json({ error: 'description is required' });
+    }
+
+    if (req.body.duration === '') {
+        return res.json({ error: 'duration is required' });
+    }
 
     var userId = req.params._id
     var { description, duration, date } = req.body
@@ -38,34 +54,42 @@ exports.registerUserExercise = async (req, res, next) => {
     })
 }
 
-/*
-{
-  username: "fcc_test",
-  count: 1,
-  _id: "5fb5853f734231456ccb3b05",
-  log: [{
-    description: "test",
-    duration: 60,
-    date: "Mon Jan 01 1990",
-  }]
-}
-*/
+
 exports.getUserLogs = async (req, res, next) => {
 
-    var userId = req.params._id
-
-    var { from, to, limit } = req.query
+    var userId = req.params._id;
 
     var user = await UserModel.findById({ _id: userId })
 
-    var exercises
+    var findConditions = { username: user.username };
 
-    if (from != null && to != null && limit != null) {
-        exercises = await ExerciseModel.find({ username: user.username, date: { $gte: from, $lt: to } }).select({ username: 0, _id: 0 }).limit(limit)
-    } else {
-        exercises = await ExerciseModel.find({ username: user.username }).select({ username: 0, _id: 0 })
+    if (
+        (req.query.from !== undefined && req.query.from !== '')
+        ||
+        (req.query.to !== undefined && req.query.to !== '')
+    ) {
+        findConditions.date = {};
+
+        if (req.query.from !== undefined && req.query.from !== '') {
+            findConditions.date.$gte = new Date(req.query.from);
+        }
+
+        if (findConditions.date.$gte == 'Invalid Date') {
+            return res.json({ error: 'from date is invalid' });
+        }
+
+        if (req.query.to !== undefined && req.query.to !== '') {
+            findConditions.date.$lte = new Date(req.query.to);
+        }
+
+        if (findConditions.date.$lte == 'Invalid Date') {
+            return res.json({ error: 'to date is invalid' });
+        }
     }
 
+    var limit = (req.query.limit !== undefined ? parseInt(req.query.limit) : 0);
+
+    var exercises = await ExerciseModel.find(findConditions).select({ username: 0, _id: 0 }).limit(limit)
 
     var userLog = {
         ...{ username: user.username, _id: user._id }, ...{ count: exercises.length }, ...{ log: exercises }
